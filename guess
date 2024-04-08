@@ -1,0 +1,46 @@
+#!/usr/bin/env perl
+use strict;
+use warnings FATAL => 'all';
+use utf8;
+use Encode::Guess qw/ascii cp932 euc-jp 7bit-jis utf8/;
+
+my %encoding_iconv_hash = (
+    "ascii"    => "ASCII",
+    "utf8"     => "UTF-8",
+    "cp932"    => "SJIS-WIN",
+    "euc-jp"   => "EUCJP-WIN",
+    "7bit-jis" => "ISO-2022-JP"
+);
+
+# 引数の数を覚えておく
+my $argv_count = @ARGV;
+
+while (my $line = <>) {
+    my $genc = guess_encoding($line);
+    my $encoding_name;
+    if ( ref $genc ){
+        $encoding_name = $genc->name;
+    } else {
+        # 候補にUTF-8が含まれていればUTF-8とする
+        if ($genc =~ /utf8/) {
+            $encoding_name = "utf8";
+        } else {
+            $encoding_name = $genc;
+        }
+    }
+    
+    # printf "%s : %s : %s\n", $ARGV, $., $encoding_name;
+
+    # ファイル終端に達するか、ASCII以外の文字コードが現れたらチェックを打ち切る
+    if (eof || $encoding_name ne "ascii") {
+        # ファイルを閉じる
+        close ARGV;
+        # 文字コード名をiconv用に変換する
+        my $encoding = $encoding_iconv_hash{$encoding_name} //= "UNKNOWN";
+        if ($argv_count <= 1) {
+            printf "%s\n", $encoding;
+        } else {
+            printf "%s: %s\n", $ARGV, $encoding;
+        }
+    }
+}
