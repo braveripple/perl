@@ -1,0 +1,72 @@
+#!/usr/bin/env perl
+# 改行コード^Y(0x19),区切り文字^V(0x16)のファイルを読むサンプル
+# =============================================================================
+# 安全ではない構文を制限する https://perldoc.jp/docs/perl/strict.pod
+use strict;
+# 警告を出力する https://perldoc.jp/docs/modules/warnings-1.23/warnings.pod
+use warnings;
+# スクリプトがUTF-8で書かれているということを宣言する https://perldoc.jp/docs/modules/utf8-1.07/utf8.pod
+use utf8;
+# 文字エンコーディングを推測するためのEncode::Guessモジュールをロードする
+use Encode::Guess qw/ascii cp932 euc-jp 7bit-jis utf8/; 
+use Encode 'decode';
+# =============================================================================
+
+foreach my $file (@ARGV) {
+    process_file($file);
+}
+
+sub process_file {
+    my ($file) = @_;
+    open my $fh, '<:raw', $file or die "Can't open file $file: $!";
+    
+    # ^Yを改行として読み込んで処理
+    local $/ = "\x19";
+    while (my $line = <$fh>) {
+        # ^Yを削除
+        $line =~ s/\x19//g;
+        # 行を^Vで分割
+        my @parts = split(/\x16/, $line);
+        my $parts_size = scalar @parts;
+        print "size[$parts_size]\n";
+
+        for my $index (0 .. $#parts) {
+            my $part = $parts[$index];
+            my $encoding_name = get_encoding_name($part);
+            my $decode_part = decode($encoding_name, $part);
+            no warnings 'utf8';
+            printf "[%d] %s : %s\n", $index, $encoding_name, $decode_part;
+            use warnings 'utf8';
+        }
+    }
+    close $fh;
+}
+
+sub get_encoding_name {
+    my ($string) = @_;
+    if (is_ascii($string)) {
+        return "ascii";
+    } else {
+        my $genc = guess_encoding($string);
+        if ( ref $genc ){
+            return $genc->name;
+        } else {
+            # printf "WARN:%s\n",$genc;
+            # utf8 > euc-jp > cp932 > 7bit-jis
+            if ($genc =~ /utf8/) {
+                return "utf8";
+            } elsif ($genc =~ /euc-jp/) {
+                return "euc-jp";
+            } elsif ($genc =~ /cp932/) {
+                return "cp932";
+            } else {
+                return "7bit-jis";
+            }
+        }
+    }
+}
+
+sub is_ascii {
+    my ($string) = @_;
+    return $string =~ /^[[:ascii:]]+$/;
+}
