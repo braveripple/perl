@@ -26,25 +26,32 @@ sub process_file {
         # ^Yを削除
         $line =~ s/\x19//g;
         # 行を^Vで分割
-        my @parts = split(/\x16/, $line);
+        my @parts = split(/\x16/, $line, -1);
         my $parts_size = scalar @parts;
-        print "size[$parts_size]\n";
+        print "size\t${parts_size}\n";
 
-        for my $index (0 .. $#parts) {
+        my $digits = length("$parts_size");
+        my $format_string = "%0${digits}d";
+
+        for my $column (1 .. $parts_size) {
+            my $index = $column - 1;
             my $part = $parts[$index];
             my $encoding_name = get_encoding_name($part);
             my $decode_part = decode($encoding_name, $part);
+            my $formatted_column = sprintf($format_string, $column);
             no warnings 'utf8';
-            printf "[%d] %s : %s\n", $index, $encoding_name, $decode_part;
+            printf "%s\t%s\t%s\n", $formatted_column, $encoding_name, $decode_part;
             use warnings 'utf8';
         }
     }
+    print "row_number\t${.}\n";
+    
     close $fh;
 }
 
 sub get_encoding_name {
     my ($string) = @_;
-    if (is_ascii($string)) {
+    if (length($string) == 0 || is_ascii($string)) {
         return "ascii";
     } else {
         my $genc = guess_encoding($string);
